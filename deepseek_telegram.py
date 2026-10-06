@@ -6,54 +6,48 @@ import io
 import logging
 import asyncio
 
-# --- 1. ПРИНУДИТЕЛЬНАЯ НАСТРОЙКА UTF-8 (Фикс ошибок кодировки ASCII) ---
+# Принудительный режим UTF-8
 os.environ["PYTHONUTF8"] = "1"
 os.environ["PYTHONIOENCODING"] = "utf-8"
-
-if sys.platform == "win32":
-    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding="utf-8", errors="replace")
-    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding="utf-8", errors="replace")
 
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command, CommandStart
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
-from openai import AsyncOpenAI, APIError, AuthenticationError, InsufficientQuotaError
+from openai import AsyncOpenAI
 
 
-# ---------------- CONFIG ----------------
-TELEGRAM_TOKEN = "8687096032:AAGiqqlV3V_GiE4kZoxWDUHzyeDfbBfY8R8"
+# ---------------- RAW CONFIG ----------------
+# Вставь сюда свои ключи как обычно:
+RAW_TELEGRAM_TOKEN = "8687096032:AAGiqqlV3V_GiE4kZoxWDUHzyeDfbBfY8R8"
+RAW_API_KEY = "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"
+RAW_BASE_URL = "https://openrouter.ai/api/v1" # или "https://openrouter.ai/api/v1"
+# --------------------------------------------
 
-# API Ключ (DeepSeek, OpenRouter или GitHub Models)
-API_KEY = "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"
+# ФУНКЦИЯ ЖЕСТКОЙ ОЧИСТКИ ОТ ВСЕХ НЕ-ASCII СИМВОЛОВ И ПРОБЕЛОВ
+def clean_ascii(text: str) -> str:
+    if not text:
+        return ""
+    # Оставляем только символы из диапазона ASCII (английские буквы, цифры и спецсимволы)
+    ascii_only = text.encode('ascii', 'ignore').decode('ascii')
+    # Убираем кавычки, пробелы и невидимые переносы
+    return re.sub(r'[\s\'\"]+', '', ascii_only)
 
-# Выберите сервер (раскомментируйте нужную пару BASE_URL и DEFAULT_MODEL):
+# Применяем очистку
+TELEGRAM_TOKEN = clean_ascii(RAW_TELEGRAM_TOKEN)
+API_KEY = clean_ascii(RAW_API_KEY)
+BASE_URL = clean_ascii(RAW_BASE_URL)
 
-# --- Вариант 1: Официальный DeepSeek API (требует баланса на platform.deepseek.com) ---
-BASE_URL = "https://openrouter.ai/api/v1"
-DEFAULT_MODEL = "deepseek-chat"
+DEFAULT_MODEL = "deepseek-chat" # Если OpenRouter, укажи: "deepseek/deepseek-chat:free"
+DEFAULT_SYSTEM_PROMPT = "Ты — вежливый и полезный ассистент в Telegram-группе."
 
-# --- Вариант 2: Бесплатный OpenRouter (нужен ключ с openrouter.ai) ---
-# BASE_URL = "https://openrouter.ai/api/v1"
-# DEFAULT_MODEL = "deepseek/deepseek-chat:free"
+# Диагностика ключей в консоли при запуске (безопасно показывает длину)
+print(f"[DEBUG] Очищенный Длина Telegram Token: {len(TELEGRAM_TOKEN)}")
+print(f"[DEBUG] Очищенный Длина API Key: {len(API_KEY)}")
 
-
-# Начальный системный промт
-DEFAULT_SYSTEM_PROMPT = (
-    "Ты — вежливый и полезный ассистент в Telegram-группе. "
-    "Отвечай кратко, понятно и по делу."
-)
-# ----------------------------------------
-
-
-# Очистка ключа и URL от случайных не-ASCII символов, пробелов и переносов строк
-CLEAN_API_KEY = re.sub(r'[^\x00-\x7F]+', '', API_KEY).strip()
-CLEAN_BASE_URL = re.sub(r'[^\x00-\x7F]+', '', BASE_URL).strip()
-
-# Инициализация OpenAI SDK
 client = AsyncOpenAI(
-    api_key=CLEAN_API_KEY,
-    base_url=CLEAN_BASE_URL
+    api_key=API_KEY,
+    base_url=BASE_URL
 )
 
 # Переменные состояния
